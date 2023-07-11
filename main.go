@@ -1,12 +1,12 @@
 package main
 
 import (
-	"context"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
 	"github.com/prranavv/Rest-API-Golang/database"
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/prranavv/Rest-API-Golang/handlers"
 )
 
 func initapp() error {
@@ -27,27 +27,33 @@ func main() {
 		panic(err)
 	}
 	defer database.CloseMongodb()
-	app := fiber.New()
-
-	app.Post("/", func(c *fiber.Ctx) error {
-		sampledoc := bson.M{"name": "sample todo"}
-		collection := database.GetCollection("todos")
-		ndoc, err := collection.InsertOne(context.TODO(), sampledoc)
-		if err != nil {
-			return c.Status(400).SendString("Error inserting todo")
-		}
-		//send down info about todo
-		return c.JSON(ndoc)
-
-	})
-
-	app.Listen(":3000")
+	app := generateapp()
+	//get the port from the env
+	port := os.Getenv("PORT")
+	app.Listen(":" + port)
 }
 
 func loadEnv() error {
-	err := godotenv.Load()
-	if err != nil {
-		return err
+	goenv := os.Getenv("GO_ENV")
+	if goenv == "" {
+		err := godotenv.Load()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func generateapp() *fiber.App {
+	app := fiber.New()
+	//create health check
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
+
+	//create the library group and routes
+	libgroup := app.Group("/library")
+	libgroup.Get("/", handlers.Testhandler)
+	libgroup.Post("/", handlers.CreateLibrary)
+	return app
 }
